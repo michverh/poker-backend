@@ -5,7 +5,7 @@ It is Texas Holdem for this year's hackathon. Connect your bot to our server and
 ## Install dependencies
 ```bash
 npm install
-```git remote
+```
 
 ## Run the server
 ```bash
