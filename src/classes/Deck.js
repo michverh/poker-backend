@@ -9,6 +9,7 @@ export class Deck {
   }
   
   reset() {
+    console.log("Did reset the deck");
     this.cards = [];
     for (let suit of SUITS) {
       for (let rank of RANKS) {

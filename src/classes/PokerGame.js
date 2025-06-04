@@ -20,6 +20,7 @@ export class PokerGame {
   
   addPlayer(player) {
     if (this.players.length < this.maxPlayers) {
+      this.dealToPlayer(player);
       this.players.push(player);
       return true;
     }
@@ -32,7 +33,7 @@ export class PokerGame {
   
   startGame() {
     if (this.players.length < 2) return false;
-    
+    console.log("Starting new game")
     this.gameState = 'dealing';
     this.pot = 0;
     this.currentBet = this.bigBlind;
@@ -80,6 +81,14 @@ export class PokerGame {
       });
     }
   }
+
+  dealToPlayer(player) {
+    if (!player) return;
+    for (let i = 0; i < 2; i++) {
+      player.hand.push(this.deck.deal());
+    }
+  }
+
   
   dealCommunityCards(count) {
     for (let i = 0; i < count; i++) {
@@ -197,6 +206,7 @@ export class PokerGame {
     // Move dealer button
     this.dealerIndex = (this.dealerIndex + 1) % this.players.length;
     
+    console.log("Game finished");
     // Reset for next hand
     setTimeout(() => {
       if (this.players.filter(p => p.chips > 0).length >= 2) {
