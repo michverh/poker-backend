@@ -1,3 +1,4 @@
+import { Deck } from './Deck.js';
 const MAX_PLAYERS = 8;
 
 export class PokerGame {

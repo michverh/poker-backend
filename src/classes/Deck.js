@@ -1,5 +1,5 @@
-import Card  from './src/classes/Card';
-import { config } from '../config/app-config';
+import { Card }  from './Card.js';
+import { config } from '../config/app-config.js';
 const { suits: SUITS, ranks: RANKS } = config;
 
 export class Deck {
