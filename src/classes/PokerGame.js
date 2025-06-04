@@ -2,7 +2,7 @@ import { Deck } from './Deck.js';
 const MAX_PLAYERS = 8;
 
 export class PokerGame {
-  constructor(id, maxPlayers = MAX_PLAYERS) {
+  constructor(id, io = undefined, maxPlayers = MAX_PLAYERS) {
     this.id = id;
     this.maxPlayers = maxPlayers;
     this.players = [];
@@ -16,6 +16,7 @@ export class PokerGame {
     this.bigBlind = 20;
     this.gameState = 'waiting'; // waiting, dealing, betting, showdown, finished
     this.bettingRound = 'preflop'; // preflop, flop, turn, river
+    this.io = io; // @TODO: there might be a better way for this
   }
   
   addPlayer(player) {
@@ -211,6 +212,9 @@ export class PokerGame {
     setTimeout(() => {
       if (this.players.filter(p => p.chips > 0).length >= 2) {
         this.startGame();
+        console.log("setTimeout", this.id, this.getGameState());
+        if (!this.io) return; // @todo: handle this...
+        this.io.to(this.id).emit('game-update', this.getGameState());
       } else {
         this.gameState = 'waiting';
       }

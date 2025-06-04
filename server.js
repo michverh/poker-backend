@@ -33,7 +33,7 @@ io.on('connection', (socket) => {
     const { gameId, playerName } = data;
     
     if (!games.has(gameId)) {
-      games.set(gameId, new PokerGame(gameId));
+      games.set(gameId, new PokerGame(gameId, io));
     }
     
     const game = games.get(gameId);
