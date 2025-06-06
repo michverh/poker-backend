@@ -1,8 +1,14 @@
-import { config } from '../config/app-config.js';
+import { config } from '../config/app-config';
+import type { TRank, TSuit } from "@/types";
 const { ranks: RANKS } = config;
 
+
 export class Card {
-  constructor(rank, suit) {
+  rank: TRank;
+  suit: TSuit;
+  value: number;
+  
+  constructor(rank: TRank, suit: TSuit) {
     this.rank = rank;
     this.suit = suit;
     this.value = RANKS.indexOf(rank);

@@ -1,10 +1,9 @@
-import { PokerGame } from './src/classes/PokerGame.js';
-import { Player } from './src/classes/Player.js';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { Player, PokerGame } from './src/entities/index';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

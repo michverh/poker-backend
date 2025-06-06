@@ -206,6 +206,7 @@
             }
             
             socket = io();
+            // @TODO: this needs to be handled differently in case of a hangup
             myPlayerId = socket.id;
             
             socket.emit('join-game', { gameId, playerName });
@@ -215,8 +216,8 @@
                     document.getElementById('join-section').style.display = 'none';
                     document.getElementById('game-section').style.display = 'block';
                 } else {
+                    // @todo:  this needs to be handled
                     console.error('Failed to join game: ' + data.error);
-                    // @TODO  this needs to be handled
                 }
             });
             
@@ -313,6 +314,7 @@
         
         function playerAction(action) {
             if (!socket) {
+                // @todo: this needs to be handled
                 console.log("There is no socket");
                 return;
             };

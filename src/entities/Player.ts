@@ -1,5 +1,17 @@
+import { Card } from './Card';
+
 export class Player {
-  constructor(id, name, chips = 1000) {
+  id: string;
+  name: string;
+  chips: number;
+  hand: Card[];
+  currentBet: number;
+  totalBet: number;
+  folded: boolean;
+  allIn: boolean;
+  connected: boolean;
+
+  constructor(id: string, name: string, chips = 1000) {
     this.id = id;
     this.name = name;
     this.chips = chips;

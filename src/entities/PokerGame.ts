@@ -1,8 +1,27 @@
-import { Deck } from './Deck.js';
-const MAX_PLAYERS = 8;
+import { Server } from 'socket.io';
+import { config } from '../config/app-config';
+import { Card, Deck, Player } from './index';
+import type { TGameState, TBettingRound } from "@/types";
+
+const { MAX_PLAYERS } = config;
 
 export class PokerGame {
-  constructor(id, io = undefined, maxPlayers = MAX_PLAYERS) {
+  id: string;
+  maxPlayers: number;
+  players: Player[];
+  deck: Deck;
+  communityCards: Card[];
+  pot: number;
+  currentBet: number;
+  currentPlayerIndex: number;
+  dealerIndex: number;
+  smallBlind: number;
+  bigBlind: number;
+  gameState: TGameState;
+  bettingRound: TBettingRound;
+  io: Server | undefined;
+  
+  constructor(id: string, io: Server, maxPlayers = MAX_PLAYERS) {
     this.id = id;
     this.maxPlayers = maxPlayers;
     this.players = [];
@@ -14,12 +33,12 @@ export class PokerGame {
     this.dealerIndex = 0;
     this.smallBlind = 10;
     this.bigBlind = 20;
-    this.gameState = 'waiting'; // waiting, dealing, betting, showdown, finished
-    this.bettingRound = 'preflop'; // preflop, flop, turn, river
+    this.gameState = 'waiting'; 
+    this.bettingRound = 'preflop';
     this.io = io; // @TODO: there might be a better way for this
   }
   
-  addPlayer(player) {
+  addPlayer(player: Player) {
     if (this.players.length < this.maxPlayers) {
       this.dealToPlayer(player);
       this.players.push(player);
@@ -28,12 +47,13 @@ export class PokerGame {
     return false;
   }
   
-  removePlayer(playerId) {
+  removePlayer(playerId: string) {
     this.players = this.players.filter(p => p.id !== playerId);
   }
   
   startGame() {
     if (this.players.length < 2) return false;
+
     console.log("Starting new game")
     this.gameState = 'dealing';
     this.pot = 0;
@@ -77,27 +97,27 @@ export class PokerGame {
     for (let i = 0; i < 2; i++) {
       this.players.forEach(player => {
         if (!player.folded) {
-          player.hand.push(this.deck.deal());
+          const card = this.deck.deal();
+          player.hand.push(card);
         }
       });
     }
   }
 
-  dealToPlayer(player) {
+  dealToPlayer(player: Player) {
     if (!player) return;
     for (let i = 0; i < 2; i++) {
       player.hand.push(this.deck.deal());
     }
   }
 
-  
-  dealCommunityCards(count) {
+  dealCommunityCards(count: number) {
     for (let i = 0; i < count; i++) {
       this.communityCards.push(this.deck.deal());
     }
   }
   
-  playerAction(playerId, action, amount = 0) {
+  playerAction(playerId: string, action: string, amount: number = 0) {
     const player = this.players.find(p => p.id === playerId);
     if (!player || player.folded || this.players[this.currentPlayerIndex].id !== playerId) {
       return false;

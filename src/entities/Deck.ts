@@ -1,8 +1,10 @@
-import { Card }  from './Card.js';
-import { config } from '../config/app-config.js';
+import { Card }  from './Card';
+import { config } from '../config/app-config';
 const { suits: SUITS, ranks: RANKS } = config;
 
 export class Deck {
+  cards: Card[];
+  
   constructor() {
     this.cards = [];
     this.reset();
@@ -27,6 +29,6 @@ export class Deck {
   }
   
   deal() {
-    return this.cards.pop();
+    return this.cards.pop() as Card;
   }
 }
