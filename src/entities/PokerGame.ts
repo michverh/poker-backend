@@ -35,7 +35,7 @@ export class PokerGame {
     this.bigBlind = 20;
     this.gameState = 'waiting'; 
     this.bettingRound = 'preflop';
-    this.io = io; // @TODO: there might be a better way for this
+    this.io = io;
   }
   
   addPlayer(player: Player) {
