@@ -1,3 +1,4 @@
+import type { TSuit, TRank } from "@/types"
 
 export const config = {
     suits: ['hearts', 'diamonds', 'clubs', 'spades'] as TSuit[],
