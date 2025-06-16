@@ -11,7 +11,7 @@ export class Player {
   allIn: boolean;
   connected: boolean;
 
-  constructor(id: string, name: string, chips = 1000) {
+  constructor(id: string, name: string, chips = 100) {
     this.id = id;
     this.name = name;
     this.chips = chips;
