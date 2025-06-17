@@ -99,6 +99,7 @@ export class Game {
     player.currentBet = amount;
     player.totalBet = amount;
     player.chips -= amount;
+    this.pot += amount;
   }
 
   dealToPlayer(player: Player) {
@@ -118,10 +119,10 @@ export class Game {
   }
 
   playerAction(playerId: string, action: string, amount: number = 0) {
-    console.log("[PlayerAction]", playerId, action, amount);
     const player = this.players.find((p) => p.id === playerId);
+    console.log("[PlayerAction]", playerId, action, amount, player);
     if (!player || player.folded || this.players[this.currentPlayerIndex].id !== playerId) {
-      return false;
+      return [false, "not your turn?", player];
     }
 
     // Check if this is the big blind's action
@@ -135,17 +136,17 @@ export class Game {
     const minRaise = this.currentBet + this.bigBlind; // Minimum raise is current bet + big blind
     if (action === "raise" && amount < this.bigBlind) {
       console.log("Invalid raise amount:", amount, "minimum raise:", this.bigBlind);
-      return false;
+      return [false, `Invalid raise amount: ${amount}, the minimum raise: ${this.bigBlind}`];
     }
 
     // Validate player has enough chips
     if (action === "call" && player.chips < (this.currentBet - player.currentBet)) {
       console.log("Not enough chips to call");
-      return false;
+      return [false, "Not enough chips to call"];
     }
     if (action === "raise" && player.chips < amount) {
       console.log("Not enough chips to raise");
-      return false;
+      return [false, "Not enough chips to raise"];
     }
 
     switch (action) {
@@ -177,14 +178,14 @@ export class Game {
       case "check":
         if (player.currentBet !== this.currentBet) {
           console.log("Cannot check - must call or fold");
-          return false;
+          return [false, "Cannot check - must call or fold"];
         }
         console.log("Player checked");
         break;
     }
 
     this.nextPlayer();
-    return true;
+    return [true, ""];
   }
 
   nextPlayer() {
@@ -232,8 +233,16 @@ export class Game {
     } else {
       // For other rounds, we need to ensure we've gone around the table at least once
       const firstToActIndex = (this.dealerIndex + 1) % this.players.length;
+      
+      // If we've gone around the table and all bets are equal
       if (this.currentPlayerIndex === firstToActIndex && playersWithEqualBets.length === activePlayers.length) {
         console.log("All players have equal bets and we've gone around the table");
+        return true;
+      }
+      
+      // If we've gone around the table and all players have acted
+      if (this.currentPlayerIndex === firstToActIndex) {
+        console.log("All players have acted and we've gone around the table");
         return true;
       }
     }

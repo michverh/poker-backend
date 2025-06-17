@@ -65,10 +65,17 @@ export class SocketHandler {
       const game = this.games.get(playerData.gameId);
       const { action, amount } = data;
 
-      if (game.playerAction(socket.id, action, amount)) {
+      const [success, message] = game.playerAction(socket.id, action, amount);
+      if (success) {
+        console.log("succs",success, message)
         this.io
           .to(playerData.gameId)
           .emit("game-update", game.getGameState());
+      } else {
+        console.log("err",success, message)
+        this.io
+          .to(playerData.gameId)
+          .emit("game-update-err", message);
       }
     });
 
