@@ -5,11 +5,13 @@ export class SocketHandler {
   players = new Map();
   games = new Map();
   viewers = new Map(); // Track viewers separately
+  playerNames = new Map(); // Track player names for reconnection
 
   constructor(private io: Server) {
     this.games = new Map();
     this.players = new Map();
     this.viewers = new Map();
+    this.playerNames = new Map();
   }
 
   initialize() {
@@ -32,7 +34,7 @@ export class SocketHandler {
       const game = this.games.get(gameId);
       if (game.players.length >= 2 && game.gameState === "waiting") {
         game.startGame();
-        this.io.to(gameId).emit("game-update", game.getGameStateWithViewers(this.getViewerCount(gameId)));
+        this.sendPersonalizedGameState(game, gameId);
         this.io.to(gameId).emit("started-game", "Some message from the BE");
       } else {
         console.log("There is not enough players", game.players, game.gameState);
@@ -47,13 +49,32 @@ export class SocketHandler {
       }
 
       const game = this.games.get(gameId);
+      
+      // Check if this player is trying to reconnect
+      const existingPlayer = this.findPlayerByName(game, playerName);
+      if (existingPlayer) {
+        // Reconnect the player with new socket ID
+        console.log("Player reconnecting:", playerName, "old ID:", existingPlayer.id, "new ID:", socket.id);
+        existingPlayer.id = socket.id;
+        existingPlayer.connected = true;
+        
+        this.players.set(socket.id, { gameId, player: existingPlayer });
+        socket.join(gameId);
+
+        this.sendPersonalizedGameState(game, gameId);
+        socket.emit("joined-game", { success: true, gameId, reconnected: true });
+        return;
+      }
+
+      // New player joining
       const player = new Player(socket.id, playerName);
 
       if (game.addPlayer(player)) {
         this.players.set(socket.id, { gameId, player });
+        this.playerNames.set(playerName, gameId); // Track player name for reconnection
         socket.join(gameId);
 
-        this.io.to(gameId).emit("game-update", game.getGameStateWithViewers(this.getViewerCount(gameId)));
+        this.sendPersonalizedGameState(game, gameId);
         socket.emit("joined-game", { success: true, gameId });
       } else {
         socket.emit("joined-game", { success: false, error: "Game is full" });
@@ -110,14 +131,27 @@ export class SocketHandler {
       const [success, message] = game.playerAction(socket.id, action, amount);
       if (success) {
         console.log("succs",success, message)
-        this.io
-          .to(playerData.gameId)
-          .emit("game-update", game.getGameStateWithViewers(this.getViewerCount(playerData.gameId)));
+        this.sendPersonalizedGameState(game, playerData.gameId);
       } else {
         console.log("err",success, message)
         this.io
           .to(playerData.gameId)
           .emit("game-update-err", message);
+      }
+    });
+
+    // New event to get current player's cards
+    socket.on("get-my-cards", () => {
+      const playerData = this.players.get(socket.id);
+      if (!playerData) return;
+
+      const game = this.games.get(playerData.gameId);
+      const player = game.players.find((p: Player) => p.id === socket.id);
+      
+      if (player) {
+        socket.emit("my-cards", {
+          cards: player.hand.map((card: any) => card.toString())
+        });
       }
     });
 
@@ -128,10 +162,20 @@ export class SocketHandler {
       if (playerData) {
         const game = this.games.get(playerData.gameId);
         if (game) {
-          game.removePlayer(socket.id);
-          this.io
-            .to(playerData.gameId)
-            .emit("game-update", game.getGameStateWithViewers(this.getViewerCount(playerData.gameId)));
+          // Mark player as disconnected instead of removing
+          let player: Player | undefined;
+          for (const p of game.players) {
+            if (p.id === socket.id) {
+              player = p;
+              break;
+            }
+          }
+          if (player) {
+            player.connected = false;
+            console.log("Player marked as disconnected:", player.name);
+          }
+          
+          this.sendPersonalizedGameState(game, playerData.gameId);
 
           // Clean up empty games
           if (game.players.length === 0) {
@@ -157,6 +201,16 @@ export class SocketHandler {
     });
   }
 
+  // Helper method to find a player by name in a game
+  findPlayerByName(game: Game, playerName: string): Player | null {
+    for (const player of game.players) {
+      if (player.name === playerName) {
+        return player;
+      }
+    }
+    return null;
+  }
+
   // Helper method to get viewer count for a game
   getViewerCount(gameId: string): number {
     let count = 0;
@@ -180,5 +234,13 @@ export class SocketHandler {
       }
     }
     return viewers;
+  }
+
+  // Helper method to send personalized game state to each player
+  sendPersonalizedGameState(game: Game, gameId: string) {
+    // For now, send the game state without any player cards to the room
+    // This ensures no one sees other players' cards
+    const safeGameState = game.getGameStateWithViewers(this.getViewerCount(gameId));
+    this.io.to(gameId).emit("game-update", safeGameState);
   }
 }

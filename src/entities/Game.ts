@@ -22,6 +22,8 @@ export class Game {
   io: Server | undefined;
   currentTimeoutId?: NodeJS.Timeout;
   bigBlindHasActed: boolean;
+  roundComplete: boolean;
+  bettingSequenceStart: number;
 
   constructor(id: string, io: Server, maxPlayers = MAX_PLAYERS) {
     this.id = id;
@@ -39,6 +41,8 @@ export class Game {
     this.bettingRound = "preflop";
     this.io = io;
     this.bigBlindHasActed = false;
+    this.roundComplete = false;
+    this.bettingSequenceStart = 0;
   }
 
   removePlayer(playerId: string) {
@@ -53,6 +57,7 @@ export class Game {
     this.communityCards = [];
     this.deck.reset();
     this.bigBlindHasActed = false;
+    this.roundComplete = false;
 
     // Reset all players
     this.players.forEach((player) => player.reset());
@@ -71,6 +76,9 @@ export class Game {
     while (this.players[this.currentPlayerIndex].folded) {
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
     }
+
+    // Set the betting sequence start to the first player to act
+    this.bettingSequenceStart = this.currentPlayerIndex;
 
     console.log("Game started with current player index:", this.currentPlayerIndex);
     return true;
@@ -172,6 +180,8 @@ export class Game {
         player.totalBet += totalRaiseAmount;
         this.pot += totalRaiseAmount;
         this.currentBet = player.currentBet;
+        this.roundComplete = false;
+        this.bettingSequenceStart = this.currentPlayerIndex;
         console.log("Player raised:", raiseAmount, "total bet:", this.currentBet, "new pot:", this.pot);
         break;
 
@@ -184,7 +194,11 @@ export class Game {
         break;
     }
 
-    this.nextPlayer();
+    // Add 2-second delay after player action
+    setTimeout(() => {
+      this.nextPlayer();
+    }, 2000);
+    
     return [true, ""];
   }
 
@@ -196,6 +210,12 @@ export class Game {
     } while (this.players[this.currentPlayerIndex].folded);
 
     console.log("[nextPlayer]", "next player", this.currentPlayerIndex);
+
+    // Check if we've completed a full round (back to betting sequence start)
+    if (this.currentPlayerIndex === this.bettingSequenceStart) {
+      this.roundComplete = true;
+      console.log("Completed full betting round, back to starting position:", this.bettingSequenceStart);
+    }
 
     // Check if betting round is complete
     if (this.isBettingRoundComplete()) {
@@ -217,34 +237,29 @@ export class Game {
 
     // For preflop, we need to ensure the big blind has had a chance to act
     if (this.bettingRound === "preflop") {
-      const bigBlindIndex = (this.dealerIndex + 2) % this.players.length;
-      
-      // If big blind hasn't acted yet
       if (!this.bigBlindHasActed) {
         console.log("Big blind hasn't acted yet");
         return false;
       }
       
-      // If we've gone around the table and all bets are equal
+      // After big blind acts, we need to go around the table at least once
+      const bigBlindIndex = (this.dealerIndex + 2) % this.players.length;
       if (this.currentPlayerIndex === bigBlindIndex && playersWithEqualBets.length === activePlayers.length) {
-        console.log("All players have equal bets and we've gone around the table");
+        console.log("Preflop complete: all players have equal bets after big blind acted");
         return true;
       }
-    } else {
-      // For other rounds, we need to ensure we've gone around the table at least once
-      const firstToActIndex = (this.dealerIndex + 1) % this.players.length;
-      
-      // If we've gone around the table and all bets are equal
-      if (this.currentPlayerIndex === firstToActIndex && playersWithEqualBets.length === activePlayers.length) {
-        console.log("All players have equal bets and we've gone around the table");
-        return true;
-      }
-      
-      // If we've gone around the table and all players have acted
-      if (this.currentPlayerIndex === firstToActIndex) {
-        console.log("All players have acted and we've gone around the table");
-        return true;
-      }
+    }
+
+    // If we've completed a full round and all bets are equal, the round is complete
+    if (this.roundComplete && playersWithEqualBets.length === activePlayers.length) {
+      console.log("Round complete: all players have equal bets after full round");
+      return true;
+    }
+
+    // If we've completed a full round and no one has raised, the round is complete
+    if (this.roundComplete && this.currentBet === 0) {
+      console.log("Round complete: no bets made after full round");
+      return true;
     }
 
     console.log("Betting round not complete:", {
@@ -252,7 +267,8 @@ export class Game {
       equalBets: playersWithEqualBets.length,
       activePlayers: activePlayers.length,
       currentPlayerIndex: this.currentPlayerIndex,
-      bigBlindHasActed: this.bigBlindHasActed
+      bigBlindHasActed: this.bigBlindHasActed,
+      roundComplete: this.roundComplete
     });
     return false;
   }
@@ -265,6 +281,7 @@ export class Game {
       player.currentBet = 0;
     });
     this.currentBet = 0;
+    this.roundComplete = false;
 
     switch (this.bettingRound) {
       case "preflop":
@@ -290,10 +307,19 @@ export class Game {
     }
 
     // Set current player to first active player after dealer for new betting round
-    this.currentPlayerIndex = (this.dealerIndex + 1) % this.players.length;
+    // In post-flop rounds, the first player to act is the first active player after the dealer
+    console.log("[nextBettingRound] Dealer position:", this.dealerIndex);
+    console.log("[nextBettingRound] Player positions: Dealer=", this.dealerIndex, "SmallBlind=", (this.dealerIndex + 1) % this.players.length, "BigBlind=", (this.dealerIndex + 2) % this.players.length);
+    
+    // Start from dealer position and find first active player (including dealer)
+    this.currentPlayerIndex = this.dealerIndex;
     while (this.players[this.currentPlayerIndex].folded) {
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+      console.log("[nextBettingRound] Skipping folded dealer, now at position:", this.currentPlayerIndex);
     }
+
+    // Set the betting sequence start to the first player to act
+    this.bettingSequenceStart = this.currentPlayerIndex;
 
     console.log(
       "[nextBettingRound] New round starting with player",
@@ -591,7 +617,7 @@ export class Game {
     }
   }
 
-  getGameState() {
+  getGameState(playerId?: string) {
     return {
       id: this.id,
       players: this.players.map((p) => ({
@@ -600,7 +626,7 @@ export class Game {
         chips: p.chips,
         currentBet: p.currentBet,
         folded: p.folded,
-        hand: p.hand.map((card) => card.toString()),
+        hand: playerId === p.id ? p.hand.map((card) => card.toString()) : [],
       })),
       communityCards: this.communityCards.map((card) => card.toString()),
       pot: this.pot,
@@ -613,8 +639,8 @@ export class Game {
   }
 
   // Method to get game state with viewer information
-  getGameStateWithViewers(viewerCount: number = 0) {
-    const baseState = this.getGameState();
+  getGameStateWithViewers(viewerCount: number = 0, playerId?: string) {
+    const baseState = this.getGameState(playerId);
     return {
       ...baseState,
       viewerCount,

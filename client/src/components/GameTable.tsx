@@ -20,9 +20,12 @@ interface GameState {
 interface GameTableProps {
   gameState: GameState;
   myPlayerId: string;
+  myCards?: string[];
 }
 
-const GameTable: React.FC<GameTableProps> = ({ gameState, myPlayerId }) => {
+const GameTable: React.FC<GameTableProps> = ({ gameState, myPlayerId, myCards = [] }) => {
+  console.log('GameTable render:', { myPlayerId, players: gameState.players.map(p => ({ id: p.id, name: p.name, handLength: p.hand.length })) });
+  
   return (
     <div className="poker-table">
       <div className="community-cards">
@@ -41,7 +44,7 @@ const GameTable: React.FC<GameTableProps> = ({ gameState, myPlayerId }) => {
             <div className="player-chips">Bet: ${player.currentBet}</div>
             <div className="player-cards">
               {player.id === myPlayerId ? (
-                player.hand.map((card, cardIndex) => (
+                myCards.map((card, cardIndex) => (
                   <Card key={cardIndex} card={card} />
                 ))
               ) : (
@@ -50,6 +53,9 @@ const GameTable: React.FC<GameTableProps> = ({ gameState, myPlayerId }) => {
                   <Card card="??" />
                 </>
               )}
+            </div>
+            <div style={{ fontSize: '10px', opacity: 0.7 }}>
+              ID: {player.id.substring(0, 8)}...
             </div>
           </div>
         ))}

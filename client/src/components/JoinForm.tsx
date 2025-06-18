@@ -3,11 +3,12 @@ import React, { useState } from 'react';
 interface JoinFormProps {
   onJoin: (name: string, gameId: string) => void;
   onStart: (gameId: string) => void;
+  onJoinAsViewer: (name: string, gameId: string) => void;
 }
 
-const JoinForm: React.FC<JoinFormProps> = ({ onJoin, onStart }) => {
+const JoinForm: React.FC<JoinFormProps> = ({ onJoin, onStart, onJoinAsViewer }) => {
   const [playerName, setPlayerName] = useState('');
-  const [gameId, setGameId] = useState('g');
+  const [gameId, setGameId] = useState('default');
 
   const handleJoin = () => {
     onJoin(playerName, gameId);
@@ -15,6 +16,10 @@ const JoinForm: React.FC<JoinFormProps> = ({ onJoin, onStart }) => {
 
   const handleStart = () => {
     onStart(gameId);
+  };
+
+  const handleJoinAsViewer = () => {
+    onJoinAsViewer(playerName, gameId);
   };
 
   return (
@@ -31,8 +36,14 @@ const JoinForm: React.FC<JoinFormProps> = ({ onJoin, onStart }) => {
         value={gameId}
         onChange={(e) => setGameId(e.target.value)}
       />
-      <button onClick={handleJoin}>Join Game</button>
-      <button onClick={handleStart}>Start Game</button>
+      <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '10px' }}>
+        <button onClick={handleJoin}>Join as Player</button>
+        <button onClick={handleJoinAsViewer}>Join as Viewer</button>
+        <button onClick={handleStart}>Start Game</button>
+      </div>
+      <p style={{ marginTop: '10px', fontSize: '14px', opacity: 0.8 }}>
+        Join as a player to participate, or as a viewer to watch the game.
+      </p>
     </div>
   );
 };
