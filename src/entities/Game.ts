@@ -608,6 +608,16 @@ export class Game {
       currentPlayerIndex: this.currentPlayerIndex,
       gameState: this.gameState,
       bettingRound: this.bettingRound,
+      viewerCount: 0, // This will be set by the socket handler
+    };
+  }
+
+  // Method to get game state with viewer information
+  getGameStateWithViewers(viewerCount: number = 0) {
+    const baseState = this.getGameState();
+    return {
+      ...baseState,
+      viewerCount,
     };
   }
 }

@@ -344,6 +344,8 @@
             socket.emit('player-action', { action, amount });
             // Clear the input after raising
             document.getElementById('raise-amount').value = "";
+
+            socket.on("game-update-err", (data)=> console.log(data))
         }
     </script>
 </body>
