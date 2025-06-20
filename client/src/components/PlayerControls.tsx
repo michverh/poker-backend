@@ -35,7 +35,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({ gameState, myPlayerId, 
     if (amount > 0) {
       onAction('raise', amount);
       setRaiseAmount('');
+      return;
     }
+    alert("Wrong amount");
   };
 
   const getCallAmount = () => {

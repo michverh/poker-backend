@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 import JoinForm from './components/JoinForm';
@@ -187,7 +187,9 @@ function App() {
 
   return (
     <div className="App">
-      <h1>Texas Hold'em Poker {playerName && `| ${playerName}`}</h1>
+      
+      <img src='/assets/logo.svg' alt="Sytac's logo" style={{margin: "20px 0 0 20px"}} /> 
+      <h1> Texas Hold'em Poker {playerName && `| ${playerName}`}</h1>
       
       {!isJoined ? (
         <JoinForm 
@@ -198,13 +200,7 @@ function App() {
       ) : (
         <div className="game-section">
           {isViewer && (
-            <div style={{ 
-              background: 'rgba(255, 255, 0, 0.2)', 
-              padding: '10px', 
-              borderRadius: '5px', 
-              marginBottom: '10px',
-              textAlign: 'center'
-            }}>
+            <div className="viewer">
               👁️ You are watching as a viewer
             </div>
           )}

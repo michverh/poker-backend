@@ -25,9 +25,9 @@ const socketHandler = new SocketHandler(io);
 socketHandler.initialize();
 
 // HTTP Routes
-app.get('/', (req, res) => {
-  res.sendFile(join(__dirname, 'public', 'index.html'));
-});
+  // app.get('/', (req, res) => {
+  //   res.sendFile(join(__dirname, 'public', 'index.html'));
+  // });
 
 // app.get('/api/games', (req, res) => {
 //   const gameList = Array.from(games.values()).map(game => ({

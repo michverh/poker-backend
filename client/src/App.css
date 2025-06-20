@@ -1,13 +1,13 @@
 .App {
   font-family: Arial, sans-serif;
-  margin: 0 auto;
-  padding: 20px;
-  background: #0f3d2c;
+  margin: 10px auto;
+  
   color: white;
   min-height: 100vh;
 }
 
 .App h1 {
+  padding: 0;
   text-align: center;
   margin-bottom: 30px;
 }
@@ -202,6 +202,14 @@
   border: 1px solid #ff6b6b;
 }
 
+.viewer {
+  background: 'rgba(255, 255, 0, 0.2)';
+  padding: '10px'; 
+  border-radius: '5px'; 
+  margin-bottom: '10px';
+  text-align: 'center';
+}
+
 /* Position players around the table */
 .player:nth-child(1) { top: -50px; left: 50%; transform: translateX(-50%); }
 .player:nth-child(2) { top: 20px; right: -100px; }
@@ -240,3 +248,5 @@
     margin: 5px 0;
   }
 }
+
+
