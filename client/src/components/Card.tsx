@@ -5,10 +5,10 @@ interface CardProps {
 }
 
 const Card: React.FC<CardProps> = ({ card }) => {
+  const img = card.trim() === '??' ? 'back-card.svg' : card.trim()+'.svg';
   return (
-    <div className="card">
-      {card}
-    </div>
+    <img src={`cards/${img}`}  className="card" />
+    
   );
 };
 
