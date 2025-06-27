@@ -1,13 +1,576 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/assets/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sytac Hackathon | Texas holdem poker</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Texas Hold'em Client</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background for game feel */
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #2d3748; /* Slightly lighter dark background */
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 960px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .card-container {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap; /* Allow cards to wrap on smaller screens */
+        }
+        .card {
+            background-color: #f7fafc;
+            color: #2d3748;
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 4rem; /* Fixed width for cards */
+            height: 5.5rem; /* Fixed height for cards */
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            font-size: 1.25rem;
+            position: relative;
+            user-select: none;
+        }
+        .card.red {
+            color: #e53e3e; /* Red for Hearts and Diamonds */
+        }
+        .card::after {
+            content: attr(data-suit);
+            position: absolute;
+            bottom: 0.25rem;
+            right: 0.25rem;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+        .card.back {
+            background-color: #a0aec0; /* Grey for card back */
+            color: #2d3748;
+            font-size: 0.875rem;
+            font-weight: normal;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .player-card {
+            background-color: #4a5568;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .player-card.current-player {
+            outline: 3px solid #63b3ed; /* Blue outline for current player */
+            box-shadow: 0 0 15px rgba(99, 179, 237, 0.5);
+        }
+        .action-button {
+            background-color: #4299e1; /* Blue button */
+            color: white;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .action-button:hover {
+            background-color: #3182ce;
+            transform: translateY(-1px);
+        }
+        .action-button:disabled {
+            background-color: #636b6f;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .input-field {
+            background-color: #2d3748;
+            border: 1px solid #4a5568;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            color: #e2e8f0;
+            width: 100%;
+            max-width: 150px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+                gap: 1rem;
+            }
+            .player-list {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            }
+            .card {
+                width: 3rem;
+                height: 4.5rem;
+                font-size: 1rem;
+                padding: 0.25rem 0.5rem;
+            }
+            .action-button {
+                padding: 0.5rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-white mb-4">Texas Hold'em</h1>
+
+        <!-- Connection Status & Join Form -->
+        <div class="bg-gray-700 p-4 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4">
+            <div id="connection-status" class="text-lg font-medium">Connecting...</div>
+            <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                <input type="text" id="playerNameInput" placeholder="Your Name" class="input-field flex-grow" value="Player1">
+                <button id="joinGameBtn" class="action-button">Join Game</button>
+                <button id="spectateGameBtn" class="action-button bg-gray-500 hover:bg-gray-600">Spectate</button>
+                <button id="readyGameBtn" class="action-button bg-green-500 hover:bg-green-600" disabled>Ready</button>
+            </div>
+        </div>
+
+        <!-- Game Info & Community Cards -->
+        <div class="bg-gray-800 p-4 rounded-lg">
+            <div id="game-message" class="text-xl text-center font-semibold mb-4 min-h-[1.5rem]"></div>
+            <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                <div class="text-lg">Pot: <span id="potAmount" class="font-bold text-yellow-400">0</span> chips</div>
+                <div class="text-lg">Current Player: <span id="currentPlayerName" class="font-bold text-blue-300">N/A</span></div>
+            </div>
+            <h3 class="text-lg font-medium mb-2 text-center">Community Cards:</h3>
+            <div id="communityCards" class="card-container min-h-[5.5rem] border-2 border-gray-600 rounded-lg p-2">
+                <!-- Community cards will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Player's Hand -->
+        <div id="myHandSection" class="bg-gray-800 p-4 rounded-lg hidden">
+            <h3 class="text-lg font-medium mb-2 text-center">Your Hand (<span id="myPlayerStatus" class="font-semibold"></span>):</h3>
+            <div id="myHandCards" class="card-container min-h-[5.5rem] border-2 border-gray-600 rounded-lg p-2">
+                <!-- Your hole cards will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Player Actions -->
+        <div id="playerActions" class="bg-gray-700 p-4 rounded-lg flex flex-col items-center gap-4 hidden">
+            <div class="flex gap-3">
+                <button id="foldBtn" class="action-button bg-red-500 hover:bg-red-600">Fold</button>
+                <button id="checkCallBtn" class="action-button bg-blue-500 hover:bg-blue-600">Check</button>
+            </div>
+            <div class="flex items-center gap-3 w-full justify-center">
+                <input type="number" id="raiseAmountInput" placeholder="Raise amount" class="input-field w-full md:w-auto" min="0" value="0">
+                <button id="raiseBtn" class="action-button bg-purple-500 hover:bg-purple-600">Raise</button>
+            </div>
+            <div id="actionError" class="text-red-400 text-sm mt-2 min-h-[1rem]"></div>
+        </div>
+
+        <!-- Other Players -->
+        <div class="bg-gray-800 p-4 rounded-lg">
+            <h3 class="text-lg font-medium mb-2 text-center">Other Players:</h3>
+            <div id="otherPlayersList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Other players' info will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WS_URL = 'ws://localhost:8080';
+        let ws;
+        let myPlayerId = null;
+        let isMyTurn = false;
+        let currentGameState = null; // To store the latest game state
+        let myLocalHand = []; // New: To store the player's own cards locally
+
+        const connectionStatusDiv = document.getElementById('connection-status');
+        const playerNameInput = document.getElementById('playerNameInput');
+        const joinGameBtn = document.getElementById('joinGameBtn');
+        const spectateGameBtn = document.getElementById('spectateGameBtn');
+        const readyGameBtn = document.getElementById('readyGameBtn');
+        const gameMessageDiv = document.getElementById('game-message');
+        const potAmountSpan = document.getElementById('potAmount');
+        const currentPlayerNameSpan = document.getElementById('currentPlayerName');
+        const communityCardsDiv = document.getElementById('communityCards');
+        const myHandSection = document.getElementById('myHandSection');
+        const myHandCardsDiv = document.getElementById('myHandCards');
+        const myPlayerStatusSpan = document.getElementById('myPlayerStatus');
+        const playerActionsDiv = document.getElementById('playerActions');
+        const foldBtn = document.getElementById('foldBtn');
+        const checkCallBtn = document.getElementById('checkCallBtn');
+        const raiseAmountInput = document.getElementById('raiseAmountInput');
+        const raiseBtn = document.getElementById('raiseBtn');
+        const actionErrorDiv = document.getElementById('actionError');
+        const otherPlayersListDiv = document.getElementById('otherPlayersList');
+
+        // Card rendering helper
+        function renderCard(card, isHidden = false) {
+            if (isHidden) {
+                return `<div class="card back">Poker Card</div>`;
+            }
+            const suitChar = { 'C': '♣', 'D': '♦', 'H': '♥', 'S': '♠' }[card.suit];
+            const isRed = card.suit === 'D' || card.suit === 'H';
+            return `
+                <div class="card ${isRed ? 'red' : ''}" data-suit="${suitChar}">
+                    ${card.rank}
+                </div>
+            `;
+        }
+
+        // Function to connect to the WebSocket server
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                connectionStatusDiv.textContent = 'Connected to server.';
+                connectionStatusDiv.classList.remove('text-red-400');
+                connectionStatusDiv.classList.add('text-green-400');
+                // Enable join/spectate buttons
+                joinGameBtn.disabled = false;
+                spectateGameBtn.disabled = false;
+                readyGameBtn.disabled = false; // Always allow ready button after connecting.
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                console.log('Received:', message);
+
+                switch (message.type) {
+                    case 'info':
+                        if (message.payload.startsWith('Your ID:')) {
+                            myPlayerId = message.payload.split('Your ID: ')[1].split('.')[0];
+                            console.log('My Player ID:', myPlayerId);
+                        }
+                        gameMessageDiv.textContent = message.payload;
+                        break;
+                    case 'error':
+                        actionErrorDiv.textContent = `Error: ${message.payload}`;
+                        console.error('Server Error:', message.payload);
+                        break;
+                    case 'state':
+                        currentGameState = message.payload;
+                        updateUI(currentGameState);
+                        break;
+                    case 'player_hand':
+                        // Only update hand if it's for the current player and they are not a spectator
+                        const myPlayerForHand = currentGameState.players.find(p => p.id === myPlayerId);
+                        if (myPlayerForHand && !myPlayerForHand.isSpectator) {
+                            myLocalHand = message.payload; // Store the hand locally
+                            myHandSection.classList.remove('hidden');
+                            myHandCardsDiv.innerHTML = myLocalHand.map(card => renderCard(card)).join('');
+                            myPlayerStatusSpan.textContent = myPlayerForHand.status.toUpperCase();
+                        }
+                        break;
+                    default:
+                        console.warn('Unknown message type:', message.type);
+                }
+            };
+
+            ws.onclose = () => {
+                connectionStatusDiv.textContent = 'Disconnected from server. Reconnecting...';
+                connectionStatusDiv.classList.remove('text-green-400');
+                connectionStatusDiv.classList.add('text-red-400');
+                joinGameBtn.disabled = true;
+                spectateGameBtn.disabled = true;
+                readyGameBtn.disabled = true;
+                myPlayerId = null; // Reset player ID on disconnect
+                myLocalHand = []; // Clear local hand on disconnect
+                setTimeout(connectWebSocket, 3000); // Attempt to reconnect after 3 seconds
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+                connectionStatusDiv.textContent = 'WebSocket error. Check console.';
+                connectionStatusDiv.classList.remove('text-green-400');
+                connectionStatusDiv.classList.add('text-red-400');
+            };
+        }
+
+        // Function to update the UI based on the game state
+        function updateUI(state) {
+            gameMessageDiv.textContent = state.message;
+            potAmountSpan.textContent = state.pot;
+            currentPlayerNameSpan.textContent = state.players.find(p => p.id === state.currentPlayerId)?.name || 'N/A';
+
+            // Render community cards
+            communityCardsDiv.innerHTML = state.communityCards.map(card => renderCard(card)).join('');
+            if (state.communityCards.length === 0) {
+                communityCardsDiv.innerHTML = '<p class="text-gray-400">No community cards yet.</p>';
+            }
+
+            // Update my hand (if player)
+            const myPlayer = state.players.find(p => p.id === myPlayerId);
+            if (myPlayer) {
+                myPlayerStatusSpan.textContent = myPlayer.status.toUpperCase();
+
+                // If player is a spectator, or sitting-out, or folded, or active but has no cards (joined mid-hand), hide their hand.
+                if (myPlayer.isSpectator || myPlayer.status === 'sitting-out' || myPlayer.status === 'folded' || (myPlayer.status === 'active' && myLocalHand.length === 0)) {
+                    myHandSection.classList.add('hidden');
+                    myHandCardsDiv.innerHTML = ''; // Clear hand display
+                } else {
+                    myHandSection.classList.remove('hidden');
+                    // Render my hand using myLocalHand, which is persistent after dealt
+                    myHandCardsDiv.innerHTML = myLocalHand.map(card => renderCard(card)).join('');
+                }
+
+                // Show/hide player actions
+                if (myPlayer.id === state.currentPlayerId && myPlayer.status === 'active' && myLocalHand.length > 0) {
+                    isMyTurn = true;
+                    playerActionsDiv.classList.remove('hidden');
+                    updateActionButtons(myPlayer, state.minimumBetForCall, state.minimumRaiseAmount);
+                } else {
+                    isMyTurn = false;
+                    playerActionsDiv.classList.add('hidden');
+                    actionErrorDiv.textContent = ''; // Clear action error when not turn
+                }
+            } else {
+                // If not myPlayer (e.g., just connected, or ID not yet received), hide actions and hand
+                myHandSection.classList.add('hidden');
+                playerActionsDiv.classList.add('hidden');
+            }
+
+            // Handle the 'Ready' button visibility and enablement
+            if (myPlayer && !myPlayer.isSpectator && (state.gamePhase === 'waiting' || state.gamePhase === 'hand-over')) {
+                readyGameBtn.disabled = false;
+                joinGameBtn.disabled = true; // Ensure join is disabled if already player
+                spectateGameBtn.disabled = true;
+                playerNameInput.disabled = true;
+            } else {
+                readyGameBtn.disabled = true;
+                // Re-enable join/spectate if not yet a player or if disconnected
+                if (!myPlayer || !myPlayer.id) {
+                     joinGameBtn.disabled = false;
+                     spectateGameBtn.disabled = false;
+                     playerNameInput.disabled = false;
+                }
+            }
+
+
+            // Render other players
+            otherPlayersListDiv.innerHTML = '';
+            state.players.filter(p => p.id !== myPlayerId).forEach(player => {
+                const playerCard = document.createElement('div');
+                // Dim spectators and sitting-out players
+                playerCard.className = `player-card ${player.id === state.currentPlayerId ? 'current-player' : ''} ${player.isSpectator || player.status === 'sitting-out' || player.status === 'folded' ? 'opacity-70' : ''} w-full`;
+                playerCard.innerHTML = `
+                    <div class="text-xl font-bold">${player.name}</div>
+                    <div class="text-md text-gray-300">Chips: <span class="font-semibold">${player.chips}</span></div>
+                    <div class="text-sm text-gray-400">Status: <span class="font-semibold">${player.status.toUpperCase()}</span></div>
+                    ${player.currentBet > 0 ? `<div class="text-sm text-yellow-300">Bet: ${player.currentBet}</div>` : ''}
+                    <div class="flex gap-1 mt-2">
+                        ${player.isDealer ? '<span class="text-green-400" title="Dealer">D</span>' : ''}
+                        ${player.isSmallBlind ? '<span class="text-orange-400" title="Small Blind">SB</span>' : ''}
+                        ${player.isBigBlind ? '<span class="text-red-400" title="Big Blind">BB</span>' : ''}
+                    </div>
+                    <div class="card-container mt-2">
+                        ${player.isSpectator || player.status === 'folded' || player.status === 'sitting-out' || state.gamePhase !== 'showdown' ?
+                            '<div class="card back"></div><div class="card back"></div>' // Show back for non-showdown, spectators, folded, sitting-out
+                            // During showdown, display the actual cards (if available in state)
+                            : (player.hand && player.hand.length > 0 ? player.hand.map(card => renderCard(card)).join('') : '<p class="text-gray-400 text-xs">No hand</p>')
+                        }
+                    </div>
+                `;
+                otherPlayersListDiv.appendChild(playerCard);
+            });
+        }
+
+        // Update action buttons based on game state
+        function updateActionButtons(myPlayer, minimumBetForCall, minimumRaiseAmount) {
+            // Ensure parameters are numbers, provide sensible defaults
+            const currentMinBetForCall = Number(minimumBetForCall || 0);
+            const currentMinRaiseAmount = Number(minimumRaiseAmount || 20); // Default to 20 (BIG_BLIND) if undefined/null
+
+            // Ensure currentBet is a number for the current player
+            const myPlayerCurrentBet = Number(myPlayer.currentBet || 0);
+            const myPlayerChips = Number(myPlayer.chips || 0);
+
+            const chipsToCall = currentMinBetForCall - myPlayerCurrentBet;
+            console.log(`[updateActionButtons] myPlayerCurrentBet: ${myPlayerCurrentBet}, currentMinBetForCall: ${currentMinBetForCall}, chipsToCall: ${chipsToCall}`);
+
+            foldBtn.disabled = false;
+            
+            // Calculate defaultRaiseValue, ensuring it's a number and positive
+            let calculatedDefaultRaiseValue = 0;
+            if (chipsToCall <= 0) { // If player can check, default raise is just the minimum raise amount
+                calculatedDefaultRaiseValue = currentMinRaiseAmount;
+            } else { // If player needs to call, default raise is call amount + minimum raise amount
+                calculatedDefaultRaiseValue = currentMinBetForCall + currentMinRaiseAmount;
+            }
+            // Ensure calculatedDefaultRaiseValue is not NaN and is at least the minimum raise amount (e.g., BIG_BLIND)
+            calculatedDefaultRaiseValue = Math.max(currentMinRaiseAmount, isNaN(calculatedDefaultRaiseValue) ? currentMinRaiseAmount : calculatedDefaultRaiseValue);
+            // Also ensure it's not more than player's total possible bet
+            calculatedDefaultRaiseValue = Math.min(calculatedDefaultRaiseValue, myPlayerChips + myPlayerCurrentBet);
+            if (isNaN(calculatedDefaultRaiseValue)) calculatedDefaultRaiseValue = currentMinRaiseAmount; // Final fallback
+
+
+            // Calculate maxBetAllowed, ensuring it's a number and positive
+            let maxBetAllowed = myPlayerChips + myPlayerCurrentBet;
+            if (isNaN(maxBetAllowed) || maxBetAllowed < 0) {
+                maxBetAllowed = 0;
+            }
+
+            raiseAmountInput.value = calculatedDefaultRaiseValue;
+            raiseAmountInput.min = calculatedDefaultRaiseValue;
+            raiseAmountInput.max = maxBetAllowed; 
+            console.log(`[updateActionButtons] Raise Input: value=${raiseAmountInput.value}, min=${raiseAmountInput.min}, max=${raiseAmountInput.max}`);
+
+
+            // Determine Check/Call button text and state
+            if (chipsToCall > 0) {
+                checkCallBtn.textContent = `Call (${chipsToCall})`;
+                console.log(`[updateActionButtons] checkCallBtn.textContent set to: Call (${chipsToCall})`);
+                // If player cannot afford full call, they can still go all-in
+                if (myPlayerChips < chipsToCall) {
+                    checkCallBtn.textContent = `All-in (${myPlayerChips})`; // Show max they can bet
+                    console.log(`[updateActionButtons] checkCallBtn.textContent adjusted to: All-in (${myPlayerChips})`);
+                    raiseBtn.disabled = true; // Cannot raise if going all-in on a call
+                } else {
+                    raiseBtn.disabled = false; // Can raise if can call
+                }
+                checkCallBtn.disabled = false;
+            } else { // chipsToCall is 0, so player can Check
+                checkCallBtn.textContent = 'Check';
+                console.log(`[updateActionButtons] checkCallBtn.textContent set to: Check`);
+                checkCallBtn.disabled = false;
+                raiseBtn.disabled = false; // Can raise from a check position
+            }
+
+            // Global check for disabling raise button if player has no chips left to contribute to a raise
+            // Or if they cannot afford even the minimum raise amount required for a raise
+            const minRaisePossible = Math.max(currentMinRaiseAmount, currentMinBetForCall + currentMinRaiseAmount);
+            if (myPlayerChips <= 0 || (myPlayerChips + myPlayerCurrentBet) < minRaisePossible) {
+                raiseBtn.disabled = true;
+                console.log(`[updateActionButtons] Raise button disabled due to insufficient chips. Player chips: ${myPlayerChips}, Min raise possible: ${minRaisePossible}`);
+            }
+
+            // Disable raise if raise amount input is invalid (on input change)
+            raiseAmountInput.oninput = () => {
+                const currentRaiseInput = parseInt(raiseAmountInput.value);
+                const minRaiseForInput = (myPlayerCurrentBet === currentMinBetForCall && chipsToCall === 0) ? currentMinRaiseAmount : (currentMinBetForCall + currentMinRaiseAmount); 
+                const calculatedMaxBetAllowed = myPlayerChips + myPlayerCurrentBet;
+
+                if (isNaN(currentRaiseInput) || currentRaiseInput < minRaiseForInput || currentRaiseInput > calculatedMaxBetAllowed || currentRaiseInput <= currentMinBetForCall) {
+                    raiseBtn.disabled = true;
+                    actionErrorDiv.textContent = `Raise must be at least ${minRaiseForInput} and not exceed your total chips (${calculatedMaxBetAllowed}).`;
+                } else {
+                    raiseBtn.disabled = false;
+                    actionErrorDiv.textContent = '';
+                }
+            };
+        }
+
+
+        // Event Listeners for actions
+        joinGameBtn.addEventListener('click', () => {
+            const name = playerNameInput.value.trim();
+            if (name) {
+                ws.send(JSON.stringify({ type: 'join', payload: { name } }));
+                // UI buttons are disabled by updateUI based on player state
+            } else {
+                actionErrorDiv.textContent = 'Please enter a name to join.';
+            }
+        });
+
+        spectateGameBtn.addEventListener('click', () => {
+            const name = playerNameInput.value.trim();
+            if (name) {
+                ws.send(JSON.stringify({ type: 'spectate', payload: { name } }));
+                // UI buttons are disabled by updateUI based on player state
+            } else {
+                actionErrorDiv.textContent = 'Please enter a name to spectate.';
+            }
+        });
+
+        readyGameBtn.addEventListener('click', () => {
+            ws.send(JSON.stringify({ type: 'ready' }));
+            gameMessageDiv.textContent = 'Signaled ready...';
+            // readyGameBtn.disabled = true; // This will be handled by updateUI based on game phase
+        });
+
+        foldBtn.addEventListener('click', () => {
+            if (isMyTurn) {
+                ws.send(JSON.stringify({ type: 'action', payload: { actionType: 'fold' } }));
+            }
+        });
+
+        checkCallBtn.addEventListener('click', () => {
+            if (isMyTurn && currentGameState && myPlayerId) { // Ensure game state and player ID exist
+                const myPlayer = currentGameState.players.find(p => p.id === myPlayerId);
+                if (!myPlayer) {
+                    console.error('My player object not found in current game state.');
+                    actionErrorDiv.textContent = 'Error: Player data missing. Please refresh.';
+                    return;
+                }
+
+                // Re-evaluate chipsToCall based on the current game state, with Number() conversions
+                const chipsToCallOnSend = Number(currentGameState.minimumBetForCall || 0) - Number(myPlayer.currentBet || 0);
+
+                let actionToSend;
+                // If chipsToCall is zero or negative, it means a "check" is allowed.
+                // Otherwise, it must be a "call".
+                if (chipsToCallOnSend <= 0) {
+                    actionToSend = 'check';
+                } else {
+                    actionToSend = 'call';
+                }
+
+                console.log(`[checkCallBtn.click] Action determined: ${actionToSend}, chipsToCallOnSend: ${chipsToCallOnSend}`);
+                ws.send(JSON.stringify({ type: 'action', payload: { actionType: actionToSend } }));
+            } else {
+                actionErrorDiv.textContent = 'Error: Not your turn or game state invalid.';
+                console.warn('Attempted check/call when not turn or game state invalid.');
+            }
+        });
+
+        raiseBtn.addEventListener('click', () => {
+            if (isMyTurn) {
+                const amount = parseInt(raiseAmountInput.value);
+                const myPlayer = currentGameState.players.find(p => p.id === myPlayerId);
+                
+                // Ensure values are numbers for calculation
+                const currentMinBetForCall = Number(currentGameState.minimumBetForCall || 0);
+                const currentMinRaiseAmount = Number(currentGameState.minimumRaiseAmount || 20);
+                const playerChips = Number(myPlayer.chips || 0);
+                const playerCurrentBet = Number(myPlayer.currentBet || 0);
+
+                const minimumRaiseRequired = currentMinBetForCall + currentMinRaiseAmount;
+                const maxBetAllowed = playerChips + playerCurrentBet;
+
+                if (isNaN(amount) || amount <= currentMinBetForCall || amount < minimumRaiseRequired || amount > maxBetAllowed) {
+                    actionErrorDiv.textContent = `Invalid raise amount. Must be at least ${minimumRaiseRequired} and not exceed your total chips (${maxBetAllowed}).`;
+                } else {
+                    ws.send(JSON.stringify({ type: 'action', payload: { actionType: 'raise', amount: amount } }));
+                    actionErrorDiv.textContent = '';
+                }
+            }
+        });
+
+        // Initialize WebSocket connection on page load
+        window.onload = connectWebSocket;
+    </script>
+</body>
 </html>
