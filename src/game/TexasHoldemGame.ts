@@ -205,9 +205,9 @@ export class TexasHoldemGame {
 
   // Start a new hand
   private startNewHand(): void {
-    // Reset and activate players who were sitting out and have chips
+    // Reset and activate players who were sitting out or folded and have chips
     this.players.forEach((p) => {
-      if (p.status === "sitting-out" && p.chips > 0) {
+      if ((p.status === "sitting-out" || p.status === "folded") && p.chips > 0) {
         p.status = "active";
         logger.info(`${p.name} is now active for the new hand.`);
       }
