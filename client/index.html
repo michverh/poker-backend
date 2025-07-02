@@ -148,7 +148,7 @@
                 <input type="text" id="playerNameInput" placeholder="Your Name" class="input-field flex-grow" value="Player1">
                 <button id="joinGameBtn" class="action-button">Join Game</button>
                 <button id="spectateGameBtn" class="action-button bg-gray-500 hover:bg-gray-600">Spectate</button>
-                <button id="readyGameBtn" class="action-button bg-green-500 hover:bg-green-600" disabled>Ready</button>
+                <button id="readyGameBtn" class="action-button bg-green-500 hover:bg-green-600">Ready</button>
             </div>
         </div>
 
@@ -357,10 +357,10 @@
             if (myPlayer && !myPlayer.isSpectator && (state.gamePhase === 'waiting' || state.gamePhase === 'hand-over')) {
                 readyGameBtn.disabled = false;
                 joinGameBtn.disabled = true; // Ensure join is disabled if already player
-                spectateGameBtn.disabled = true;
+                // spectateGameBtn.disabled = true;
                 playerNameInput.disabled = true;
             } else {
-                readyGameBtn.disabled = true;
+                //readyGameBtn.disabled = true;
                 // Re-enable join/spectate if not yet a player or if disconnected
                 if (!myPlayer || !myPlayer.id) {
                      joinGameBtn.disabled = false;
@@ -499,6 +499,8 @@
             const name = playerNameInput.value.trim();
             if (name) {
                 ws.send(JSON.stringify({ type: 'spectate', payload: { name } }));
+                joinGameBtn.disabled = true;
+                readyGameBtn.disabled = false; // Always allow ready button after connecting.
                 // UI buttons are disabled by updateUI based on player state
             } else {
                 actionErrorDiv.textContent = 'Please enter a name to spectate.';
