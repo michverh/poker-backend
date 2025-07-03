@@ -376,6 +376,20 @@
                 const playerCard = document.createElement('div');
                 // Dim spectators and sitting-out players
                 playerCard.className = `player-card ${player.id === state.currentPlayerId ? 'current-player' : ''} ${player.isSpectator || player.status === 'sitting-out' || player.status === 'folded' ? 'opacity-70' : ''} w-full`;
+                let handHtml = '';
+                if (state.hands && state.hands[player.id]) {
+                    // Spectator: show actual cards if available
+                    if (state.hands[player.id].length > 0) {
+                        handHtml = state.hands[player.id].map(card => renderCard(card)).join('');
+                    } else {
+                        handHtml = '<p class="text-gray-400 text-xs">No hand</p>';
+                    }
+                } else {
+                    // Not a spectator or no hands info: use old logic
+                    handHtml = (player.isSpectator || player.status === 'folded' || player.status === 'sitting-out' || state.gamePhase !== 'showdown')
+                        ? '<div class="card back"></div><div class="card back"></div>'
+                        : (player.hand && player.hand.length > 0 ? player.hand.map(card => renderCard(card)).join('') : '<p class="text-gray-400 text-xs">No hand</p>');
+                }
                 playerCard.innerHTML = `
                     <div class="text-xl font-bold">${player.name}</div>
                     <div class="text-md text-gray-300">Chips: <span class="font-semibold">${player.chips}</span></div>
@@ -387,11 +401,7 @@
                         ${player.isBigBlind ? '<span class="text-red-400" title="Big Blind">BB</span>' : ''}
                     </div>
                     <div class="card-container mt-2">
-                        ${player.isSpectator || player.status === 'folded' || player.status === 'sitting-out' || state.gamePhase !== 'showdown' ?
-                            '<div class="card back"></div><div class="card back"></div>' // Show back for non-showdown, spectators, folded, sitting-out
-                            // During showdown, display the actual cards (if available in state)
-                            : (player.hand && player.hand.length > 0 ? player.hand.map(card => renderCard(card)).join('') : '<p class="text-gray-400 text-xs">No hand</p>')
-                        }
+                        ${handHtml}
                     </div>
                 `;
                 otherPlayersListDiv.appendChild(playerCard);

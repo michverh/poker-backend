@@ -65,7 +65,22 @@ export class TexasHoldemGame {
     this.serverMessage = message; // Update server message before broadcasting
     const publicGameState = this.getPublicGameState();
     this.players.forEach((player) => {
-      this.sendToPlayer(player, "state", publicGameState);
+      if (player.isSpectator) {
+        // Spectators get all hands
+        const hands: Record<string, Card[]> = {};
+        this.players.forEach((p) => {
+          hands[p.id] = p.hand;
+        });
+        // Attach hands to the game state for spectators
+        const spectatorState = {
+          ...publicGameState,
+          hands,
+        };
+        this.sendToPlayer(player, "state", spectatorState);
+      } else {
+        // Regular players get the public state only
+        this.sendToPlayer(player, "state", publicGameState);
+      }
     });
     logger.logGameState(publicGameState); // Log current game state for persistence (simulated)
   }
@@ -216,6 +231,9 @@ export class TexasHoldemGame {
       } else if (p.status === "folded" && p.chips > 0) {
         p.status = "active";
         logger.info(`${p.name} remains sitting out after folding last hand.`);
+      } else if (p.status === "all-in" && p.chips > 0) {
+        p.status = "active";
+        logger.info(`${p.name} is now active for the new hand.`);
       }
       p.hand = [];
       p.currentBet = 0;
@@ -227,7 +245,7 @@ export class TexasHoldemGame {
       players.push(p)
     });
 
-    const activePlayers = players.filter((p) => p.status === "active" || p.status === "folded");
+    const activePlayers = players.filter((p) => p.status === "active" || p.status === "folded" || p.status === "all-in");
     if (activePlayers.length < 2) {
       this.serverMessage = "Need at least 2 active players to start a hand.";
       this.broadcastState();
@@ -559,23 +577,23 @@ export class TexasHoldemGame {
       }
 
       case "raise": {
-		const minRaise = this.minimumBetForCall + this.lastRaiseAmount;
-
-		if (amount === undefined || (amount < minRaise && player.chips > amount)) {
-		this.sendToPlayer(player, "error", `Raise must be at least ${minRaise}, unless all-in.`);
-		logger.warn(
-            `${player.name} tried to raise an invalid amount: ${amount}.`
-          );
-		return;
-		}
-
-        const totalBetAfterRaise = amount;
+        // Accept both 'raise by' and 'total bet' semantics
+        let totalBetAfterRaise: number;
+        if (amount === undefined) {
+          this.sendToPlayer(player, "error", "Raise amount required.");
+          logger.warn(`${player.name} tried to raise with no amount.`);
+          return;
+        }
+        if (amount <= player.currentBet) {
+          // Treat as 'raise by' amount
+          totalBetAfterRaise = player.currentBet + amount;
+        } else {
+          // Treat as 'total bet' amount
+          totalBetAfterRaise = amount;
+        }
         const actualRaiseAmount = totalBetAfterRaise - player.currentBet;
-        const minimumRaiseRequired =
-          this.minimumBetForCall + this.lastRaiseAmount;
-
-        // Check if the raise meets the minimum raise requirement
-        const isAllIn = player.chips <= amount;
+        const minimumRaiseRequired = this.minimumBetForCall + this.lastRaiseAmount;
+        const isAllIn = player.chips <= actualRaiseAmount;
         if (totalBetAfterRaise < minimumRaiseRequired && !isAllIn) {
           this.sendToPlayer(
             player,
@@ -587,7 +605,6 @@ export class TexasHoldemGame {
           );
           break;
         }
-
         if (actualRaiseAmount > player.chips) {
           this.sendToPlayer(
             player,
@@ -599,19 +616,15 @@ export class TexasHoldemGame {
           );
           break;
         }
-
         player.chips -= actualRaiseAmount;
         player.currentBet += actualRaiseAmount;
         this.pot += actualRaiseAmount;
-
         this.lastRaiseAmount = actualRaiseAmount; // Update last raise amount
         this.minimumBetForCall = totalBetAfterRaise; // Update the minimum bet to call
-
         // Reset hasActed for all other active players (who are not all-in or folded)
         this.players
           .filter((p) => p.status === "active" && p.id !== player.id)
           .forEach((p) => (p.hasActed = false));
-
         if (player.chips === 0) {
           player.status = "all-in";
           this.serverMessage = `${player.name} raised to ${totalBetAfterRaise} and is all-in. Pot: ${this.pot}`;
@@ -852,16 +865,46 @@ export class TexasHoldemGame {
     );
 
     if (winners.length > 0) {
+      // --- SIDE POT LOGIC START ---
+      // 1. Gather all players who are not spectators, sitting-out, or folded, and have a hand
+      const eligiblePlayers = this.players.filter(
+        (p) =>
+          p.status !== "folded" &&
+          p.status !== "sitting-out" &&
+          p.status !== "spectator" &&
+          p.hand.length > 0
+      );
+      // 2. Sort by total chips committed (currentBet + chips spent this hand)
+      // We'll use each player's total bet for this hand (currentBet is reset at round end, so track chips spent)
+      // For this implementation, we assume all-in players' max win is their total bet * number of callers
+      // We'll reconstruct the bet history from player.currentBet and chips spent
+      // For simplicity, we use the sum of all bets (currentBet is 0 at showdown, so we need to track per-hand bets in future for full accuracy)
+      // For now, we use a simplified model: everyone can win the full pot (as before), but we note this is not full side pot logic
+      // --- END SIDE POT LOGIC (placeholder, see note below) ---
+      // TODO: For full side pot support, track per-hand bet history for each player
+      // For now, fallback to previous logic:
       const winnerNames = winners.map((w) => w.player.name).join(" and ");
       const potShare = Math.floor(this.pot / winners.length); // Split pot evenly
-
-      winners.forEach((w) => {
+      const remainder = this.pot % winners.length;
+      let dealerWinnerIndex = 0;
+      let minIndex = this.players.length;
+      winners.forEach((w, i) => {
+        const idx = this.players.findIndex((p) => p.id === w.player.id);
+        if (idx !== -1 && idx < minIndex) {
+          minIndex = idx;
+          dealerWinnerIndex = i;
+        }
+      });
+      winners.forEach((w, i) => {
         w.player.chips += potShare;
+        if (i === dealerWinnerIndex) {
+          w.player.chips += remainder;
+        }
         logger.info(
-          `${w.player.name} received ${potShare} chips. New chips: ${w.player.chips}`
+          `${w.player.name} received ${potShare + (i === dealerWinnerIndex ? remainder : 0)} chips. New chips: ${w.player.chips}`
         );
       });
-      this.serverMessage = `${winnerNames} win the pot of ${this.pot} chips with a ${winners[0].handRank.type}! Each gets ${potShare}.`;
+      this.serverMessage = `${winnerNames} win the pot of ${this.pot} chips with a ${winners[0].handRank.type}! Each gets ${potShare}${remainder ? ` (dealer gets +${remainder})` : ''}.`;
       logger.info(this.serverMessage);
     }
 
@@ -936,7 +979,7 @@ export class TexasHoldemGame {
 
     // Automatically start a new hand if enough active players
     const activePlayersCount = this.players.filter(
-      (p) => p.status === "active" || p.status === "folded"
+      (p) => p.status === "active" || p.status === "folded" || p.status === "all-in"
     ).length;
     if (activePlayersCount >= 2) {
       setTimeout(() => this.startNewHand(), 5000); // Start next hand after a delay

@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 
 // Types for game state (simplified for demo)
@@ -20,9 +18,10 @@ type GameState = {
   currentPlayerId: string | null;
   gamePhase: string;
   message: string;
+  hands?: Record<string, any[]>;
 };
 
-const WS_URL = 'ws://localhost:3001';
+const WS_URL = `ws://${window.location.hostname}:3001`;
 
 function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -82,6 +81,7 @@ function App() {
       {gameState ? (
         <>
           <div className="game-message">{gameState.message}</div>
+          {/* Show all hands if present (spectator view) */}
           <div className="players-list">
             <h2>Players</h2>
             <ul>
