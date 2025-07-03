@@ -38,6 +38,7 @@ export class TexasHoldemGame {
   private minimumBetForCall: number = 0; // The highest bet made in the current round
   private lastRaiseAmount: number = BIG_BLIND; // Tracks the size of the last raise for minimum raise rule
   private serverMessage: string = "Waiting for players to join...";
+  private actionTimeout: NodeJS.Timeout | null = null; // Timer for auto-fold
 
   constructor() {
     this.deck = new Deck();
@@ -205,11 +206,16 @@ export class TexasHoldemGame {
 
   // Start a new hand
   private startNewHand(): void {
-    // Reset and activate players who were sitting out or folded and have chips
+    const players:Player[] = []
+    // Reset and activate players who were sitting out and have chips
     this.players.forEach((p) => {
-      if ((p.status === "sitting-out" || p.status === "folded") && p.chips > 0) {
+      console.log({p})
+      if (p.status === "sitting-out" && p.chips > 0) {
         p.status = "active";
         logger.info(`${p.name} is now active for the new hand.`);
+      } else if (p.status === "folded" && p.chips > 0) {
+        p.status = "active";
+        logger.info(`${p.name} remains sitting out after folding last hand.`);
       }
       p.hand = [];
       p.currentBet = 0;
@@ -217,9 +223,11 @@ export class TexasHoldemGame {
       p.isDealer = false;
       p.isSmallBlind = false;
       p.isBigBlind = false;
+
+      players.push(p)
     });
 
-    const activePlayers = this.players.filter((p) => p.status === "active");
+    const activePlayers = players.filter((p) => p.status === "active" || p.status === "folded");
     if (activePlayers.length < 2) {
       this.serverMessage = "Need at least 2 active players to start a hand.";
       this.broadcastState();
@@ -387,6 +395,18 @@ export class TexasHoldemGame {
       return;
     }
 
+    // Clear any previous timer
+    if (this.actionTimeout) {
+      clearTimeout(this.actionTimeout);
+      this.actionTimeout = null;
+    }
+
+    // Start a 30-second timer for auto-fold
+    this.actionTimeout = setTimeout(() => {
+      logger.info(`Auto-folding player ${currentPlayer.name} (${currentPlayer.id}) due to timeout.`);
+      this.handlePlayerAction(currentPlayer.id, "fold");
+    }, 30000);
+
     const chipsToCall = this.minimumBetForCall - currentPlayer.currentBet;
     this.serverMessage = `It's ${
       currentPlayer.name
@@ -475,6 +495,12 @@ export class TexasHoldemGame {
 
     const chipsToCall = this.minimumBetForCall - player.currentBet;
     let actionSuccessful = false;
+
+    // Cancel the auto-fold timer if the player acts
+    if (this.actionTimeout) {
+      clearTimeout(this.actionTimeout);
+      this.actionTimeout = null;
+    }
 
     switch (actionType) {
       case "fold":
@@ -884,7 +910,8 @@ export class TexasHoldemGame {
         p.hasActed = false;
         return true; // Keep spectators
       }
-      if (p.chips <= 0) {
+      
+      if (p.chips <= 0 && p.status !== "spectator") {
         p.status = "sitting-out"; // Cannot participate in next hands
         this.sendToPlayer(
           p,
@@ -909,7 +936,7 @@ export class TexasHoldemGame {
 
     // Automatically start a new hand if enough active players
     const activePlayersCount = this.players.filter(
-      (p) => p.status === "active"
+      (p) => p.status === "active" || p.status === "folded"
     ).length;
     if (activePlayersCount >= 2) {
       setTimeout(() => this.startNewHand(), 5000); // Start next hand after a delay

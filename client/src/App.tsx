@@ -1,34 +1,114 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 
+// Types for game state (simplified for demo)
+type Player = {
+  id: string;
+  name: string;
+  chips: number;
+  status: string;
+  isDealer: boolean;
+  isSmallBlind: boolean;
+  isBigBlind: boolean;
+  isSpectator: boolean;
+};
+
+type GameState = {
+  players: Player[];
+  currentPlayerId: string | null;
+  gamePhase: string;
+  message: string;
+};
+
+const WS_URL = 'ws://localhost:3001';
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [countdown, setCountdown] = useState<number>(30);
+  const wsRef = useRef<WebSocket | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevPlayerIdRef = useRef<string | null>(null);
+
+  // Connect to WebSocket and handle messages
+  useEffect(() => {
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'state') {
+          setGameState(data.data);
+        }
+      } catch (e) {
+        // Ignore non-JSON or unrelated messages
+      }
+    };
+    return () => {
+      ws.close();
+    };
+  }, []);
+
+  // Countdown logic: reset when currentPlayerId changes
+  useEffect(() => {
+    if (!gameState) return;
+    const currentPlayerId = gameState.currentPlayerId;
+    if (prevPlayerIdRef.current !== currentPlayerId) {
+      setCountdown(30);
+      prevPlayerIdRef.current = currentPlayerId;
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (currentPlayerId) {
+        timerRef.current = setInterval(() => {
+          setCountdown((c) => (c > 0 ? c - 1 : 0));
+        }, 1000);
+      }
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [gameState]);
+
+  // Stop timer at 0
+  useEffect(() => {
+    if (countdown === 0 && timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+  }, [countdown]);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="App">
+      <h1>Poker Game</h1>
+      {gameState ? (
+        <>
+          <div className="game-message">{gameState.message}</div>
+          <div className="players-list">
+            <h2>Players</h2>
+            <ul>
+              {gameState.players.map((p) => (
+                <li key={p.id} style={{ fontWeight: p.id === gameState.currentPlayerId ? 'bold' : 'normal' }}>
+                  {p.name} ({p.chips} chips)
+                  {p.isDealer && ' [D]'}
+                  {p.isSmallBlind && ' [SB]'}
+                  {p.isBigBlind && ' [BB]'}
+                  {p.status === 'folded' && ' (Folded)'}
+                  {p.status === 'all-in' && ' (All-in)'}
+                  {p.status === 'sitting-out' && ' (Sitting Out)'}
+                  {p.status === 'spectator' && ' (Spectator)'}
+                  {p.id === gameState.currentPlayerId && (
+                    <span style={{ color: 'red', marginLeft: 8 }}>
+                      ← Acting ({countdown}s)
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      ) : (
+        <div>Connecting to game...</div>
+      )}
+    </div>
   )
 }
 
