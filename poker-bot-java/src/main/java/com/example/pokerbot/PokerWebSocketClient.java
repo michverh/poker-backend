@@ -10,6 +10,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import com.example.pokerbot.model.Card;
 import com.example.pokerbot.model.GameState;
+import com.example.pokerbot.model.GeminiContext;
+import com.example.pokerbot.model.GeminiAction;
+
+import java.util.stream.Collectors;
+import java.util.Arrays;
 
 @Service
 public class PokerWebSocketClient {
@@ -92,11 +97,33 @@ public class PokerWebSocketClient {
                 .findFirst().orElse(null);
             if (me != null && "active".equals(me.status) && currentHand != null) {
                 try {
-                    String gameStateJson = objectMapper.writeValueAsString(gameState);
-                    String handJson = objectMapper.writeValueAsString(currentHand);
-                    String action = geminiAiService.getBotAction(gameStateJson, handJson);
-                    // For now, only support fold/call/check. Raise requires amount.
-                    String actionMsg = "{\"type\":\"action\",\"payload\":{\"actionType\":\"" + action + "\"}}";
+                    // Build GeminiContext
+                    GeminiContext ctx = new GeminiContext();
+                    ctx.playerHand = Arrays.asList(currentHand);
+                    ctx.communityCards = gameState.communityCards;
+                    ctx.activePlayers = gameState.players.stream()
+                        .filter(p -> "active".equals(p.status) || "all-in".equals(p.status))
+                        .map(p -> {
+                            GeminiContext.PlayerInfo pi = new GeminiContext.PlayerInfo();
+                            pi.name = p.name;
+                            pi.chips = p.chips;
+                            pi.currentBet = p.currentBet;
+                            return pi;
+                        })
+                        .collect(Collectors.toList());
+                    ctx.pot = gameState.pot;
+                    ctx.amountToCall = gameState.minimumBetForCall;
+                    ctx.minimumRaiseAmount = gameState.minimumRaiseAmount;
+                    ctx.bettingRound = gameState.currentBettingRound;
+
+                    GeminiAction action = geminiAiService.getBotAction(ctx);
+                    String actionMsg;
+                    if ("raise".equals(action.actionType)) {
+                        int amount = action.amount != null ? action.amount : ctx.minimumRaiseAmount;
+                        actionMsg = String.format("{\"type\":\"action\",\"payload\":{\"actionType\":\"raise\",\"amount\":%d}}", amount);
+                    } else {
+                        actionMsg = String.format("{\"type\":\"action\",\"payload\":{\"actionType\":\"%s\"}}", action.actionType);
+                    }
                     webSocket.send(actionMsg);
                 } catch (Exception e) {
                     e.printStackTrace();
