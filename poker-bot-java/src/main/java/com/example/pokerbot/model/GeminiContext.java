@@ -1,7 +1,10 @@
 package com.example.pokerbot.model;
 
 import java.util.List;
+import java.util.Objects;
+import lombok.ToString;
 
+@ToString
 public class GeminiContext {
     public List<Card> playerHand;
     public List<Card> communityCards;
@@ -11,10 +14,24 @@ public class GeminiContext {
     public int minimumRaiseAmount;
     public String bettingRound;
 
+    @ToString
     public static class PlayerInfo {
         public String name;
         public int chips;
         public int currentBet;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            PlayerInfo that = (PlayerInfo) o;
+            return chips == that.chips && currentBet == that.currentBet && Objects.equals(name, that.name);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(name, chips, currentBet);
+        }
     }
 
     public String getPlayerHandString() {

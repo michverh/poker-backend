@@ -3,3 +3,4 @@ node_modules
 bot
 generated
 poker-bot-java/target
+./.idea

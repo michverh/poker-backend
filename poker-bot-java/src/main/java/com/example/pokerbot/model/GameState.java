@@ -2,6 +2,9 @@ package com.example.pokerbot.model;
 
 import java.util.List;
 
+import lombok.ToString;
+
+@ToString
 public class GameState {
     public List<Player> players;
     public List<Card> communityCards;

@@ -49,19 +49,22 @@ public class PokerWebSocketClient {
                     switch (type) {
                         case "state":
                             GameState gameState = objectMapper.treeToValue(payload, GameState.class);
+                            log.info("Game state is {}", gameState);
                             handleGameState(webSocket, gameState);
                             break;
                         case "player_hand":
                             Card[] hand = objectMapper.treeToValue(payload, Card[].class);
+                            log.info("Received player hand: {}", Arrays.toString(hand));
                             handlePlayerHand(hand);
                             break;
                         case "info":
                             // Optionally handle info
+                            log.info("Game info: {}", payload);
                             break;
                         case "error":
                             // Optionally handle error
+                            log.info("Game error: {}", payload);
                             break;
-                        default:
                             // Unknown message type
                     }
                 } catch (Exception e) {
