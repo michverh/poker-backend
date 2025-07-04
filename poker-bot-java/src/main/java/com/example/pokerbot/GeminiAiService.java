@@ -116,6 +116,7 @@ public class GeminiAiService {
               - If "Bet to call" is greater than 0, you can "call" to match the bet or "fold" or "raise"
               - You are an expert poker player. Analyze the situation and provide a recommendation.
               - If AmountToCall is 0, don't fold
+              - Don't be a pussy
               
               Please provide the recommended action (options: 'fold', 'check', 'call', 'raise'), the amount to raise if applicable and the reasoning why.
               Reply ONLY with a single JSON object: { "actionType": string, "amount": number (required if actionType is 'raise', omit otherwise), "reasoning": "Explain why the decision was made" }.
