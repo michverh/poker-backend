@@ -16,6 +16,7 @@ public class GameState {
     public int minimumRaiseAmount;
     public int minimumBetForCall;
 
+    @ToString
     public static class Player {
         public String id;
         public String name;

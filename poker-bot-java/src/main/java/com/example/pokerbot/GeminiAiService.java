@@ -84,6 +84,7 @@ public class GeminiAiService {
                   Community cards: """ + ctx.getCommunityCardsString() + """
                   Pot size: """ + ctx.pot + """
                   Bet to call: """+ ctx.amountToCall + """
+                  Minimum raise amount: """ + ctx.minimumRaiseAmount + """
                   My stack: """ + ctx.activePlayers.stream().filter(p -> p.name.equals(playerName)).findFirst().map(p -> p.chips).orElse(0) + """
                   Opponents remaining: """ + ctx.activePlayers.size() + """
                   Opponent stack sizes: """ + ctx.activePlayers.stream().filter(p -> !p.name.equals(playerName))
@@ -94,8 +95,10 @@ public class GeminiAiService {
                   My position: """ + ctx.activePlayers.stream()
                         .filter(p -> p.name.equals(playerName))
                         .map(p -> p.name + " (position: " + p.currentBet + ")").findFirst().orElse("Unknown") + """
-                  Please provide the recommended action
-                  Reply ONLY with a single JSON object: { \\"actionType\\": string, \\"amount\\": number (required if actionType is 'raise', omit otherwise) }.
+                  You are an expert poker player. Analyze the situation and provide a recommendation, make sure to check my stack size before making a decision and also the position relative to the dealer.
+                  Don't call when you can check.
+                  Please provide the recommended action (options contain 'fold', 'check', 'call', 'raise'), the amount to raise if applicable and the reasoning why\\n
+                  Reply ONLY with a single JSON object: { \\"actionType\\": string, \\"amount\\": number (required if actionType is 'raise', omit otherwise, \\"reasoning\\": Explain why the decision was made) }.
                   Do not include any explanation or extra text.\\n");
                   """);
         try {
