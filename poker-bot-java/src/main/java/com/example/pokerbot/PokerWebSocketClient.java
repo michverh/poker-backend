@@ -1,5 +1,6 @@
 package com.example.pokerbot;
 
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,6 +17,7 @@ import com.example.pokerbot.model.GeminiAction;
 import java.util.stream.Collectors;
 import java.util.Arrays;
 
+@Slf4j
 @Service
 public class PokerWebSocketClient {
     private final OkHttpClient client = new OkHttpClient.Builder()
@@ -124,6 +126,7 @@ public class PokerWebSocketClient {
                     } else {
                         actionMsg = String.format("{\"type\":\"action\",\"payload\":{\"actionType\":\"%s\"}}", action.actionType);
                     }
+                    log.info("Sending action: {}", actionMsg);
                     webSocket.send(actionMsg);
                 } catch (Exception e) {
                     e.printStackTrace();

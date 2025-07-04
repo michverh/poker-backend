@@ -23,6 +23,7 @@ public class GeminiAiService {
     private final OkHttpClient client = new OkHttpClient();
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private String playerName = "GeminiBot";
     
     public GeminiAction getBotAction(GeminiContext ctx) throws IOException {
         String prompt = buildPrompt(ctx);
@@ -41,46 +42,62 @@ public class GeminiAiService {
                 throw new IOException("Unexpected code " + response);
             }
             String responseBody = response.body().string();
-            log.info("Action taking based on hand: {} and table: {} - ", ctx.getPlayerHandString(), ctx.getCommunityCardsString(), responseBody);
+            String actionTypeForLog = null;
             JsonNode root = objectMapper.readTree(responseBody);
             JsonNode candidates = root.path("candidates");
             if (candidates.isArray() && candidates.size() > 0) {
                 String content = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
+                // Remove markdown and parse JSON
+                String json = content.replaceAll("(?s)```json|```|`", "").trim();
+                GeminiAction actionObj = null;
                 try {
-                    return objectMapper.readValue(content, GeminiAction.class);
+                    actionObj = objectMapper.readValue(json, GeminiAction.class);
+                    actionTypeForLog = actionObj.actionType;
                 } catch (Exception e) {
                     // fallback: try to parse actionType from string
-                    GeminiAction fallback = new GeminiAction();
-                    String action = content.trim().toLowerCase();
-                    if (action.contains("fold")) {
-                        fallback.actionType = "fold";
-                    } else if (action.contains("call")) {
-                        fallback.actionType = "call";
-                    } else if (action.contains("raise")) {
-                        fallback.actionType = "raise";
-                        fallback.amount = 0;
-                    } else if (action.contains("check")) {
-                        fallback.actionType = "check";
-                    } else {
-                        fallback.actionType = "fold";
-                    }
-                    return fallback;
+                    String action = json.trim().toLowerCase();
+                    if (action.contains("fold")) actionTypeForLog = "fold";
+                    else if (action.contains("call")) actionTypeForLog = "call";
+                    else if (action.contains("raise")) actionTypeForLog = "raise";
+                    else if (action.contains("check")) actionTypeForLog = "check";
+                    else actionTypeForLog = "fold";
                 }
+                log.info("Action taking based on hand: {} and table: {} - {}", ctx.getPlayerHandString(), ctx.getCommunityCardsString(), actionTypeForLog);
+                if (actionObj != null) return actionObj;
+                GeminiAction fallback = new GeminiAction();
+                fallback.actionType = actionTypeForLog;
+                return fallback;
             }
             GeminiAction def = new GeminiAction();
             def.actionType = "fold";
+            log.info("Action taking based on hand: {} and table: {} - {}", ctx.getPlayerHandString(), ctx.getCommunityCardsString(), "fold");
             return def;
         }
     }
     
     private String buildPrompt(GeminiContext ctx) {
         StringBuilder sb = new StringBuilder();
-        sb.append("You are a professional Texas Hold'em poker bot. ");
-        sb.append("Given the following JSON context, recommend the statistically most advantageous move (fold, call, raise, or check). ");
-        sb.append("Do NOT risk all your chips (go all-in or raise to all-in) unless the probability of winning the hand is above 95%. ");
-        sb.append("If you choose to raise, suggest a statistically optimal amount to raise (within the allowed range). ");
-        sb.append(
-            "Reply ONLY with a single JSON object: { \"actionType\": string, \"amount\": number (required if actionType is 'raise', omit otherwise) }. Do not include any explanation or extra text.\n");
+        sb.append("""
+                  Given the following Texas Hold’em situation, suggest the best action (fold, check, call, bet, raise, or all-in) and explain why:
+                  Stage: """+ ctx.bettingRound+ """
+                  My hole cards: """+ ctx.getPlayerHandString() + """
+                  Community cards: """ + ctx.getCommunityCardsString() + """
+                  Pot size: """ + ctx.pot + """
+                  Bet to call: """+ ctx.amountToCall + """
+                  My stack: """ + ctx.activePlayers.stream().filter(p -> p.name.equals(playerName)).findFirst().map(p -> p.chips).orElse(0) + """
+                  Opponents remaining: """ + ctx.activePlayers.size() + """
+                  Opponent stack sizes: """ + ctx.activePlayers.stream().filter(p -> !p.name.equals(playerName))
+                        .map(p -> p.name + " (" + p.chips + ")").reduce((a, b) -> a + ", " + b).orElse("None") + """
+                  Opponent actions so far: """ + ctx.activePlayers.stream()
+                        .filter(p -> !p.name.equals(playerName))
+                        .map(p -> p.name + " (" + p.currentBet + ")").reduce((a, b) -> a + ", " + b).orElse("None") + """
+                  My position: """ + ctx.activePlayers.stream()
+                        .filter(p -> p.name.equals(playerName))
+                        .map(p -> p.name + " (position: " + p.currentBet + ")").findFirst().orElse("Unknown") + """
+                  Please provide the recommended action
+                  Reply ONLY with a single JSON object: { \\"actionType\\": string, \\"amount\\": number (required if actionType is 'raise', omit otherwise) }.
+                  Do not include any explanation or extra text.\\n");
+                  """);
         try {
             String contextJson = objectMapper.writeValueAsString(ctx);
             sb.append("Context: ").append(contextJson).append("\n");
